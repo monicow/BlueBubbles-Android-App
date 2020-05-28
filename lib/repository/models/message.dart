@@ -45,7 +45,7 @@ class Message {
   String associatedMessageType;
   String expressiveSendStyleId;
   DateTime timeExpressiveSendStyleId;
-  Handle handle;
+  Handle from;
   bool hasAttachments;
 
   Message(
@@ -76,7 +76,7 @@ class Message {
       this.associatedMessageType,
       this.expressiveSendStyleId,
       this.timeExpressiveSendStyleId,
-      this.handle,
+      this.from,
       this.hasAttachments});
 
   factory Message.fromMap(Map<String, dynamic> json) {
@@ -144,8 +144,8 @@ class Message {
         timeExpressiveSendStyleId: json.containsKey("timeExpressiveSendStyleId")
             ? parseDate(json["timeExpressiveSendStyleId"])
             : null,
-        handle: json.containsKey("handle")
-            ? (json['handle'] != null ? Handle.fromMap(json['handle']) : null)
+        from: json.containsKey("from")
+            ? (json['from'] != null ? Handle.fromMap(json['from']) : null)
             : null,
         hasAttachments: json.containsKey("attachments")
             ? (((json['attachments'] as List<dynamic>).length > 0)
@@ -164,8 +164,16 @@ class Message {
     }
 
     // Save the participant
-    if (this.handle != null) {
-      await this.handle.save();
+    if (this.from != null) {
+      await this.from.save();
+
+      // Pull out the from ID, if it's present and not null
+      if (this.handleId == null && this.from.id != null) {
+        debugPrint("setting handle ID to from ID: " + this.from.id.toString());
+        this.handleId = this.from.id;
+      }
+    } else {
+      debugPrint("this.from is null");
     }
 
     // If it already exists, update it
@@ -175,8 +183,8 @@ class Message {
       if (map.containsKey("ROWID")) {
         map.remove("ROWID");
       }
-      if (map.containsKey("handle")) {
-        map.remove("handle");
+      if (map.containsKey("from")) {
+        map.remove("from");
       }
 
       //this is where the issue is
@@ -248,7 +256,7 @@ class Message {
         : [];
   }
 
-  Future<Handle> getHandle() async {
+  Future<Handle> getFrom() async {
     final Database db = await DBProvider.db.database;
 
     var res = await db.rawQuery(
@@ -262,9 +270,9 @@ class Message {
         " WHERE message.ROWID = ?;",
         [this.id]);
 
-    this.handle =
+    this.from =
         (res.isNotEmpty) ? res.map((c) => Handle.fromMap(c)).toList()[0] : null;
-    return this.handle;
+    return this.from;
   }
 
   static Future<Message> findOne(Map<String, dynamic> filters) async {
@@ -333,6 +341,6 @@ class Message {
         "timeExpressiveSendStyleId": (timeExpressiveSendStyleId == null)
             ? null
             : timeExpressiveSendStyleId.millisecondsSinceEpoch,
-        "handle": (handle != null) ? handle.toMap() : null
+        "from": (from != null) ? from.toMap() : null
       };
 }
