@@ -97,7 +97,7 @@ class _BlueBubblesTextFieldState extends State<BlueBubblesTextField>
       List<AssetPathEntity> list =
           await PhotoManager.getAssetPathList(onlyAll: true);
       List<AssetEntity> images =
-          await list.first.getAssetListRange(start: 0, end: 60);
+          await list.first.getAssetListRange(start: 0, end: 30);
       _images = <AssetEntity>[];
       images.forEach((element) {
         _images.add(element);

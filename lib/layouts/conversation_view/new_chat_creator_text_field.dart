@@ -64,6 +64,14 @@ class _NewChatCreatorTextFieldState extends State<NewChatCreatorTextField> {
             return contact;
           }
         }
+        if (value.contains("@")) {
+          return new Contact(emails: [new Item(value: value)]);
+        } else if (new RegExp(
+                r"/\(?([0-9]{3})\)?([ .-]?)([0-9]{3})\2([0-9]{4})/",
+                caseSensitive: false)
+            .hasMatch(cleansePhoneNumber(value))) {
+          return new Contact(phones: [new Item(value: value)]);
+        }
       }
     }
 
