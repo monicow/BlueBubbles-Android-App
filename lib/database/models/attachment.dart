@@ -1,10 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/message.dart';
+import 'package:bluebubbles/database/repository/database.dart';
 import 'package:sqflite/sqflite.dart';
-
-import '../database.dart';
 
 Attachment attachmentFromJson(String str) {
   final jsonData = json.decode(str);

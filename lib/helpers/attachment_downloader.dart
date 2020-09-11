@@ -7,9 +7,9 @@ import 'dart:typed_data';
 
 import 'package:bluebubbles/managers/life_cycle_manager.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/socket_manager.dart';
 import 'package:flutter/material.dart';
 
@@ -168,7 +168,7 @@ class AttachmentDownloader {
         Uint8List bytes = Uint8List.fromList(data);
         file = await writeToFile(bytes, pathName);
       }
-      
+
       // Finish the downloader
       SocketManager().finishDownloader(attachment.guid);
       LifeCycleManager().finishDownloader();

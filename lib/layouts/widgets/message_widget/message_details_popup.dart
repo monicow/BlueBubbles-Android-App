@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:bluebubbles/helpers/utils.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/reaction_detail_widget.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:clipboard/clipboard.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -67,9 +67,7 @@ class _MessageDetailsPopupState extends State<MessageDetailsPopup>
                 color: Colors.black.withAlpha(200),
                 child: Column(
                   children: <Widget>[
-                    Container(
-                      height: 45.0
-                    ),
+                    Container(height: 45.0),
                     AnimatedSize(
                       vsync: this,
                       duration: Duration(milliseconds: 500),

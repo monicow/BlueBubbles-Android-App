@@ -9,8 +9,8 @@ import 'package:bluebubbles/layouts/conversation_view/conversation_view.dart';
 import 'package:bluebubbles/layouts/conversation_view/new_chat_creator_text_field.dart';
 import 'package:bluebubbles/managers/contact_manager.dart';
 import 'package:bluebubbles/managers/new_message_manager.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/handle.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/handle.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -266,7 +266,6 @@ class _NewChatCreatorState extends State<NewChatCreator> {
                     Chat newChat = Chat.fromMap(data["data"]);
                     await newChat.save();
                     await ChatBloc().updateChatPosition(newChat);
-
 
                     String title = await getFullChatTitle(newChat);
                     Navigator.of(context, rootNavigator: true).pop();

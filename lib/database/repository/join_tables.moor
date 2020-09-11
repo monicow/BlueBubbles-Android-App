@@ -1,0 +1,62 @@
+CREATE TABLE chat_handle_join (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        chatId INTEGER NOT NULL,
+        handleId INTEGER NOT NULL,
+        FOREIGN KEY(chatId) REFERENCES chat(ROWID),
+        FOREIGN KEY(handleId) REFERENCES handle(ROWID)
+        );
+
+CREATE TABLE chat_message_join (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        chatId INTEGER NOT NULL,
+        messageId INTEGER NOT NULL,
+        FOREIGN KEY(chatId) REFERENCES chat(ROWID),
+        FOREIGN KEY(messageId) REFERENCES message(ROWID)
+        );
+
+CREATE TABLE attachment_message_join (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        attachmentId INTEGER NOT NULL,
+        messageId INTEGER NOT NULL,
+        FOREIGN KEY(attachmentId) REFERENCES attachment(ROWID),
+        FOREIGN KEY(messageId) REFERENCES message(ROWID)
+        );
+
+CREATE TABLE handle (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        address TEXT UNIQUE NOT NULL,
+        country TEXT DEFAULT NULL,
+        uncanonicalizedId TEXT DEFAULT NULL
+        ) AS HandleEntity;
+        
+CREATE TABLE chat (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        guid TEXT UNIQUE NOT NULL,
+        style INTEGER NOT NULL,
+        chatIdentifier TEXT NOT NULL,
+        isArchived INTEGER DEFAULT 0,
+        isMuted INTEGER DEFAULT 0,
+        hasUnreadMessage INTEGER DEFAULT 0,
+        latestMessageDate INTEGER DEFAULT 0,
+        latestMessageText TEXT,
+        displayName TEXT DEFAULT NULL
+        ) AS ChatEntity;
+
+
+
+CREATE TABLE attachment (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        guid TEXT NOT NULL,
+        uti TEXT NOT NULL,
+        mimeType TEXT DEFAULT NULL,
+        transferState INTEGER DEFAULT 0,
+        isOutgoing INTEGER DEFAULT 0,
+        transferName INTEGER NOT NULL,
+        totalBytes INTEGER NOT NULL,
+        isSticker INTEGER DEFAULT 0,
+        hideAttachment INTEGER DEFAULT 0,
+        blurhash VARCHAR(64) DEFAULT NULL,
+        height INTEGER DEFAULT NULL,
+        width INTEGER DEFAULT NULL
+        ) AS AttachmentEntity;
+        

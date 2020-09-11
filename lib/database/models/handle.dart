@@ -1,7 +1,7 @@
 import 'dart:convert';
+import 'package:bluebubbles/database/repository/database.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../database.dart';
 import './chat.dart';
 
 Handle handleFromJson(String str) {

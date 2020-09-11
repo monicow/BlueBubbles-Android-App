@@ -1,15 +1,15 @@
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/helpers/utils.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/group_event.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/message_content/message_attachments.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/received_message.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/sent_message.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/models/chat.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../helpers/utils.dart';
-import '../../../repository/models/message.dart';
 
 class MessageWidget extends StatefulWidget {
   MessageWidget({

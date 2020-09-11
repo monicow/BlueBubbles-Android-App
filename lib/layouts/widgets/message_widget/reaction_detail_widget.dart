@@ -1,7 +1,7 @@
 import 'package:bluebubbles/helpers/utils.dart';
 import 'package:bluebubbles/layouts/widgets/contact_avatar_widget.dart';
-import 'package:bluebubbles/repository/models/handle.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/handle.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -44,7 +44,7 @@ class _ReactionDetailWidgetState extends State<ReactionDetailWidget> {
 
     Color iconColor = Colors.white;
     if (Theme.of(context).accentColor.computeLuminance() >= 0.179) {
-        iconColor = Colors.black.withAlpha(95);
+      iconColor = Colors.black.withAlpha(95);
     }
 
     return Padding(
@@ -83,7 +83,8 @@ class _ReactionDetailWidgetState extends State<ReactionDetailWidget> {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.only(top: 8.0, left: 7.0, right: 7.0, bottom: 7.0),
+              padding: const EdgeInsets.only(
+                  top: 8.0, left: 7.0, right: 7.0, bottom: 7.0),
               child: SvgPicture.asset(
                 'assets/reactions/${widget.message.associatedMessageType}-black.svg',
                 color: widget.message.associatedMessageType == "love"

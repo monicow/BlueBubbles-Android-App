@@ -16,10 +16,10 @@ import 'package:bluebubbles/managers/notification_manager.dart';
 import 'package:bluebubbles/managers/outgoing_queue.dart';
 import 'package:bluebubbles/managers/queue_manager.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/database.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/repository/database.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/socket_manager.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sqflite/sqflite.dart';
@@ -80,8 +80,7 @@ class ActionHandler {
     // Send all the messages
     for (Message message in messages) {
       // Add the message to the UI and DB
-      NewMessageManager()
-          .addMessage(chat, message, outgoing: true);
+      NewMessageManager().addMessage(chat, message, outgoing: true);
       await chat.addMessage(message);
 
       // Create params for the queue item
@@ -372,8 +371,7 @@ class ActionHandler {
       // Otherwise, replace the temp message
       if (existing != null) {
         await Message.delete({'guid': data['tempGuid']});
-        NewMessageManager()
-            .removeMessage(chats.first, data['tempGuid']);
+        NewMessageManager().removeMessage(chats.first, data['tempGuid']);
       } else {
         await Message.replaceMessage(data["tempGuid"], message,
             chat: chats.first);
@@ -466,8 +464,7 @@ class ActionHandler {
       }
 
       chats.forEach((element) {
-        if (!isHeadless)
-          NewMessageManager().addMessage(element, message);
+        if (!isHeadless) NewMessageManager().addMessage(element, message);
       });
     }
   }

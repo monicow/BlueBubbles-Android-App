@@ -10,9 +10,9 @@ import 'package:bluebubbles/helpers/utils.dart';
 import 'package:bluebubbles/managers/life_cycle_manager.dart';
 import 'package:bluebubbles/managers/new_message_manager.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/socket_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:image_size_getter/image_size_getter.dart';
@@ -46,7 +46,6 @@ class AttachmentSender {
     Chat chat,
     String text,
   ) {
-
     // Set default chunk size to what is set in the settings
     _chunkSize = SettingsManager().settings.chunkSize * 1024;
     _chat = chat;
@@ -149,12 +148,11 @@ class AttachmentSender {
     );
 
     sentMessage = Message(
-      guid: _attachmentGuid,
-      text: "",
-      dateCreated: DateTime.now(),
-      hasAttachments: true,
-      attachments: [messageAttachment]
-    );
+        guid: _attachmentGuid,
+        text: "",
+        dateCreated: DateTime.now(),
+        hasAttachments: true,
+        attachments: [messageAttachment]);
 
     if (_text != "") {
       messageWithText = Message(

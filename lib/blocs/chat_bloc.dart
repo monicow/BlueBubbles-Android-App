@@ -1,12 +1,12 @@
 import 'dart:async';
 
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/handle.dart';
 import 'package:bluebubbles/managers/contact_manager.dart';
 import 'package:bluebubbles/managers/new_message_manager.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/repository/database.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/material.dart';
-
-import '../repository/models/handle.dart';
-import '../repository/models/chat.dart';
 
 class ChatBloc {
   //Stream controller is the 'Admin' that manages
@@ -83,10 +83,12 @@ class ChatBloc {
       if (_chats[i].guid != chat.guid) continue;
 
       // Don't move/update the chat if the latest message for it is newer than the incoming one
-      int latest = chat.latestMessageDate != null ? chat.latestMessageDate.millisecondsSinceEpoch : 0;
+      int latest = chat.latestMessageDate != null
+          ? chat.latestMessageDate.millisecondsSinceEpoch
+          : 0;
       if (_chats[i].latestMessageDate != null &&
-              _chats[i].latestMessageDate.millisecondsSinceEpoch >
-                  latest ?? 0) {
+              _chats[i].latestMessageDate.millisecondsSinceEpoch > latest ??
+          0) {
         shouldUpdate = false;
       }
 

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:bluebubbles/action_handler.dart';
 import 'package:bluebubbles/blocs/chat_bloc.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/helpers/attachment_downloader.dart';
 import 'package:bluebubbles/blocs/setup_bloc.dart';
 import 'package:bluebubbles/helpers/contstants.dart';
@@ -12,19 +14,17 @@ import 'package:bluebubbles/managers/new_message_manager.dart';
 import 'package:bluebubbles/managers/notification_manager.dart';
 import 'package:bluebubbles/managers/queue_manager.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/database.dart';
+import 'package:bluebubbles/database/repository/database.dart';
 import 'package:flutter_socket_io/socket_io_manager.dart';
 import 'package:flutter_socket_io/flutter_socket_io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 
-import 'helpers/attachment_sender.dart';
-import 'managers/method_channel_interface.dart';
-import 'repository/models/attachment.dart';
-import 'repository/models/message.dart';
-import './repository/models/chat.dart';
-import './repository/models/handle.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/handle.dart';
+import 'package:bluebubbles/helpers/attachment_sender.dart';
+import 'package:bluebubbles/managers/method_channel_interface.dart';
 
 enum SocketState {
   CONNECTED,

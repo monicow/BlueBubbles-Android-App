@@ -3,8 +3,8 @@ import 'dart:collection';
 
 import 'package:bluebubbles/helpers/message_helper.dart';
 import 'package:bluebubbles/managers/new_message_manager.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -60,7 +60,6 @@ class MessageBloc {
             baseEvent["remove"] = action["guid"];
           } else if (actionType == NewMessageAction.UPDATE &&
               _allMessages.containsKey(action["oldGuid"])) {
-            
             // If we want to updating an existing message, remove the old one, and add the new one
             _allMessages.remove(action["oldGuid"]);
             insert(action["message"], addToSink: false);

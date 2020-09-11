@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/message.dart';
 
 class NewMessageAction {
   // ignore: non_constant_identifier_names

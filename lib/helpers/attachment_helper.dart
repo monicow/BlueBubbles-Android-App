@@ -1,5 +1,5 @@
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:vcard_parser/vcard_parser.dart';
@@ -16,7 +16,7 @@ class AttachmentHelper {
       "item1.URL;type=pref:http://maps.apple.com/?ll=$longitude\\,$latitude&q=$longitude\\,$latitude",
       "item1.X-ABLabel:map url",
       "END:VCARD"
-      ""
+          ""
     ];
 
     return lines.join("\n");
@@ -85,7 +85,8 @@ class AttachmentHelper {
 
     // If the file is an image, compress it for the preview
     if ((attachment.mimeType ?? "").startsWith("image/")) {
-      String fn = fileName.split(".").sublist(0, fileName.length - 1).join("") + "prev";
+      String fn =
+          fileName.split(".").sublist(0, fileName.length - 1).join("") + "prev";
       String ext = fileName.split(".").last;
       pathName = "$appDocPath/attachments/${attachment.guid}/$fn.$ext";
     }

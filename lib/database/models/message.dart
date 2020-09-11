@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:bluebubbles/managers/new_message_manager.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/repository/database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../database.dart';
 import 'chat.dart';
 import 'handle.dart';
 import '../../helpers/utils.dart';
@@ -459,7 +459,8 @@ class Message {
 
     List<Message> toDelete = await Message.find(where);
     for (Message msg in toDelete) {
-      await db.delete("chat_message_join", where: "messageId = ?", whereArgs: [msg.id]);
+      await db.delete("chat_message_join",
+          where: "messageId = ?", whereArgs: [msg.id]);
       await db.delete("message", where: "ROWID = ?", whereArgs: [msg.id]);
     }
   }

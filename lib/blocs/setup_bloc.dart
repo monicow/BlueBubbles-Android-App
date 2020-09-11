@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:bluebubbles/helpers/message_helper.dart';
 import 'package:bluebubbles/managers/contact_manager.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
+import 'package:bluebubbles/database/models/chat.dart';
 import 'package:bluebubbles/settings.dart';
 import 'package:bluebubbles/socket_manager.dart';
 import 'package:flutter/material.dart';

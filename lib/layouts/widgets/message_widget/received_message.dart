@@ -2,7 +2,7 @@ import 'package:bluebubbles/helpers/utils.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/message_details_popup.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/reactions.dart';
 import 'package:bluebubbles/managers/method_channel_interface.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -270,9 +270,7 @@ class _ReceivedMessageState extends State<ReceivedMessage> {
                     children: <Widget>[
                       RichText(
                         text: TextSpan(
-                          style: Theme.of(context)
-                              .textTheme
-                              .subtitle2,
+                          style: Theme.of(context).textTheme.subtitle2,
                           children: [
                             TextSpan(
                               text: "${widget.timeStamp["date"]}, ",

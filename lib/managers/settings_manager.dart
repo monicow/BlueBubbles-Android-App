@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:bluebubbles/database/repository/database.dart';
+import 'package:bluebubbles/database/repository/moor_database.dart';
 import 'package:bluebubbles/settings.dart';
 import 'package:bluebubbles/socket_manager.dart';
 import 'package:flutter/cupertino.dart';
@@ -29,6 +31,7 @@ class SettingsManager {
     new File(SettingsManager().appDocDir.path + "/debug.txt")
         .create()
         .then((value) => debugFile = value);
+    AppDatabase db = await DBProvider.db.appDatabase;
   }
 
   Future<void> getSavedSettings(

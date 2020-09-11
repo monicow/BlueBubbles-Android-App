@@ -10,7 +10,7 @@ import 'package:bluebubbles/managers/method_channel_interface.dart';
 import 'package:bluebubbles/managers/navigator_manager.dart';
 import 'package:bluebubbles/managers/notification_manager.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
-import 'package:bluebubbles/repository/database.dart';
+import 'package:bluebubbles/database/repository/database.dart';
 import 'package:bluebubbles/layouts/setup/setup_view.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/scheduler.dart' hide Priority;
@@ -72,6 +72,7 @@ Future<Null> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DBProvider.db.initDB();
   await initializeDateFormatting('fr_FR', null);
+
   runZonedGuarded<Future<Null>>(() async {
     runApp(Main());
   }, (Object error, StackTrace stackTrace) async {

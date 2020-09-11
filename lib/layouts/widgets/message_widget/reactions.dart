@@ -1,4 +1,4 @@
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -70,12 +70,15 @@ class _ReactionsState extends State<Reactions> {
                     }
 
                     // Check if light background
-                    if (!anyFromMe && Theme.of(context).accentColor.computeLuminance() >= 0.179) {
+                    if (!anyFromMe &&
+                        Theme.of(context).accentColor.computeLuminance() >=
+                            0.179) {
                       iconColor = Colors.black.withAlpha(95);
                     }
 
                     reactionIcon[Padding(
-                      padding: const EdgeInsets.only(top: 8.0, left: 7.0, right: 7.0, bottom: 7.0),
+                      padding: const EdgeInsets.only(
+                          top: 8.0, left: 7.0, right: 7.0, bottom: 7.0),
                       child: SvgPicture.asset(
                         'assets/reactions/$key-black.svg',
                         color: key == love ? Colors.pink : iconColor,
@@ -99,8 +102,8 @@ class _ReactionsState extends State<Reactions> {
                 children: <Widget>[
                   for (int i = 0; i < reactionIcon.keys.toList().length; i++)
                     Padding(
-                      padding:
-                          EdgeInsets.fromLTRB(i.toDouble() * 20.0, topPadding, rightPadding, 0),
+                      padding: EdgeInsets.fromLTRB(
+                          i.toDouble() * 20.0, topPadding, rightPadding, 0),
                       child: Container(
                         height: 28,
                         width: 28,

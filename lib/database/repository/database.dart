@@ -1,5 +1,7 @@
 import 'dart:io';
 
+// import 'package:bluebubbles/repository/tables/moor_database.dart';
+import 'package:bluebubbles/database/repository/moor_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,6 +21,8 @@ class DBProvider {
   DBProvider._();
   static final DBProvider db = DBProvider._();
 
+  AppDatabase _appDatabase;
+
   static Database _database;
   static String _path = "";
 
@@ -30,7 +34,12 @@ class DBProvider {
     return _database;
   }
 
-  String get path => _path;
+  Future<AppDatabase> get appDatabase async {
+    if (_appDatabase != null) return _appDatabase;
+
+    _appDatabase = AppDatabase();
+    return _appDatabase;
+  }
 
   initDB() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
@@ -201,6 +210,6 @@ class DBProvider {
 
   deleteDB(Database db) async {
     db.close();
-    deleteDatabase(_path);
+    // deleteDatabase(_path);
   }
 }

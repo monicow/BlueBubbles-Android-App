@@ -4,9 +4,8 @@ import 'package:bluebubbles/blocs/chat_bloc.dart';
 import 'package:bluebubbles/helpers/utils.dart';
 import 'package:bluebubbles/layouts/widgets/contact_avatar_widget.dart';
 import 'package:bluebubbles/managers/contact_manager.dart';
-import 'package:bluebubbles/repository/models/chat.dart';
-import 'package:bluebubbles/repository/models/handle.dart';
-import 'package:bluebubbles/socket_manager.dart';
+import 'package:bluebubbles/database/models/chat.dart';
+import 'package:bluebubbles/database/models/handle.dart';import 'package:bluebubbles/socket_manager.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,11 +51,13 @@ class _ContactTileState extends State<ContactTile> {
     Contact contact = ContactManager().getCachedContact(widget.handle.address);
     if (contact == null || contact.avatar.length == 0) return null;
     MemoryImage tmpAvatar = MemoryImage(
-      await FlutterImageCompress.compressWithList(contact.avatar, quality: 50));
+        await FlutterImageCompress.compressWithList(contact.avatar,
+            quality: 50));
 
-    if (contactImage == null || contactImage.bytes.length != tmpAvatar.bytes.length) {
+    if (contactImage == null ||
+        contactImage.bytes.length != tmpAvatar.bytes.length) {
       contactImage = tmpAvatar;
-      if (this.mounted) setState(() {}); 
+      if (this.mounted) setState(() {});
     }
   }
 

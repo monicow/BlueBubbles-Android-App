@@ -1,4 +1,4 @@
-import 'package:bluebubbles/repository/models/attachment.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../socket_manager.dart';

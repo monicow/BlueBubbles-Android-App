@@ -1,4 +1,4 @@
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:bluebubbles/helpers/utils.dart';
@@ -68,9 +68,7 @@ class _DeliveredReceiptState extends State<DeliveredReceipt>
                 children: <Widget>[
                   Text(
                     text,
-                    style: Theme.of(context)
-                        .textTheme
-                        .subtitle2,
+                    style: Theme.of(context).textTheme.subtitle2,
                   )
                 ],
               ),

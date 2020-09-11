@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:bluebubbles/layouts/image_viewer/image_viewer.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/message_content/message_attachments.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
 import 'package:bluebubbles/helpers/attachment_helper.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -25,19 +25,18 @@ class _ImageWidgetState extends State<ImageWidget> {
     super.didChangeDependencies();
     if (!widget.savedAttachmentData.imageData
         .containsKey(widget.attachment.guid)) {
-
       // If it's an image, compress the image when loading it
       if (AttachmentHelper.canCompress(widget.attachment)) {
         widget.savedAttachmentData.imageData[widget.attachment.guid] =
-          await FlutterImageCompress.compressWithFile(
-            widget.file.absolute.path,
-            quality: 70 // This is arbitrary
-          );
+            await FlutterImageCompress.compressWithFile(
+                widget.file.absolute.path,
+                quality: 70 // This is arbitrary
+                );
 
-      // All other attachments can be held in memory as bytes
+        // All other attachments can be held in memory as bytes
       } else {
         widget.savedAttachmentData.imageData[widget.attachment.guid] =
-          await widget.file.readAsBytes();
+            await widget.file.readAsBytes();
       }
 
       if (this.mounted) setState(() {});
@@ -50,15 +49,15 @@ class _ImageWidgetState extends State<ImageWidget> {
       children: <Widget>[
         widget.savedAttachmentData.imageData[widget.attachment.guid] == null
             ? Container(
-              child: LinearProgressIndicator(
-                backgroundColor: Colors.grey,
-                valueColor:  AlwaysStoppedAnimation(Theme.of(context).primaryColor),
-              ),
-              padding: EdgeInsets.all(2.0),
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width / 3,
-              )
-            )
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.grey,
+                  valueColor:
+                      AlwaysStoppedAnimation(Theme.of(context).primaryColor),
+                ),
+                padding: EdgeInsets.all(2.0),
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width / 3,
+                ))
             : Hero(
                 tag: widget.attachment.guid,
                 child: Image.memory(widget

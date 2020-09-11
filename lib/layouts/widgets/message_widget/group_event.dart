@@ -1,5 +1,5 @@
 import 'package:bluebubbles/helpers/utils.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/material.dart';
 
 enum ItemTypes {
@@ -32,9 +32,7 @@ class _GroupEventState extends State<GroupEvent> {
         children: <Widget>[
           Text(
             text,
-            style: Theme.of(context)
-                .textTheme
-                .subtitle2,
+            style: Theme.of(context).textTheme.subtitle2,
           ),
         ],
       ),

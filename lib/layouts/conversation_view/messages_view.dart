@@ -2,8 +2,8 @@ import 'package:bluebubbles/blocs/message_bloc.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/message_content/message_attachments.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/message_widget.dart';
 import 'package:bluebubbles/layouts/widgets/message_widget/new_message_loader.dart';
-import 'package:bluebubbles/repository/models/attachment.dart';
-import 'package:bluebubbles/repository/models/message.dart';
+import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:bluebubbles/database/models/message.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:bluebubbles/layouts/widgets/send_widget.dart';
@@ -111,7 +111,7 @@ class _MessageViewState extends State<MessageView>
             if (_listKey != null && _listKey.currentState != null) {
               try {
                 _listKey.currentState.removeItem(
-                  i, (context, animation) => Container(),
+                    i, (context, animation) => Container(),
                     duration: Duration(milliseconds: 0));
               } catch (ex) {
                 debugPrint("Error removing item animation");
