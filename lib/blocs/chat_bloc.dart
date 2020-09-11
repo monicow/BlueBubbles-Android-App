@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bluebubbles/database/models/chat.dart';
 import 'package:bluebubbles/database/models/handle.dart';
 import 'package:bluebubbles/managers/contact_manager.dart';
+import 'package:bluebubbles/managers/life_cycle_manager.dart';
 import 'package:bluebubbles/managers/new_message_manager.dart';
 import 'package:bluebubbles/database/repository/database.dart';
 import 'package:bluebubbles/database/models/message.dart';
@@ -47,6 +48,7 @@ class ChatBloc {
   }
 
   Future<void> refreshChats() async {
+    _chats = [];
     debugPrint("[ChatBloc] -> Fetching chats...");
 
     // Get the contacts in case we haven't
@@ -73,6 +75,10 @@ class ChatBloc {
 
   /// Inserts a [chat] into the chat bloc based on the lastMessage data
   Future<void> updateChatPosition(Chat chat) async {
+    if (_chats == null && LifeCycleManager().isAlive) {
+      await this.refreshChats();
+    }
+
     int currentIndex = -1;
     bool shouldUpdate = true;
 
@@ -131,15 +137,6 @@ class ChatBloc {
     if (actionType == NewMessageAction.ADD) {
       // Find the chat to update
       Chat updatedChat = action["chat"];
-      Message newMessage = action["message"];
-
-      // If the message is from "me", mark the chat as unread
-      if (newMessage != null && newMessage.isFromMe) {
-        await updatedChat.markReadUnread(false);
-      }
-
-      debugPrint("Updating CHAT");
-      debugPrint(action["chat"].toString());
 
       // Update the tile values for the chat (basically just the title)
       await initTileValsForChat(updatedChat);

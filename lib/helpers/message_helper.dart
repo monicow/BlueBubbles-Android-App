@@ -7,6 +7,7 @@ import 'package:bluebubbles/managers/notification_manager.dart';
 import 'package:bluebubbles/database/models/chat.dart';
 import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/database/models/attachment.dart';
+import 'package:contacts_service/contacts_service.dart';
 import 'package:flutter/cupertino.dart';
 
 class MessageHelper {
@@ -47,49 +48,23 @@ class MessageHelper {
 
       Message message = Message.fromMap(item);
       if (notifyForNewMessage) {
-        Message existingMessage = await Message.findOne({"guid": message.guid});
-        if (existingMessage == null) {
-          String title = await getFullChatTitle(msgChat);
-
-          if (!message.isFromMe &&
-              message.handle != null &&
-              (NotificationManager().chatGuid != msgChat.guid ||
-                  !LifeCycleManager().isAlive) &&
-              !msgChat.isMuted &&
-              !NotificationManager()
-                  .processedNotifications
-                  .contains(message.guid)) {
-            NotificationManager().createNewNotification(
-                title,
-                MessageHelper.getNotificationText(message),
-                msgChat.guid,
-                Random().nextInt(9998) + 1,
-                msgChat.id,
-                message.dateCreated.millisecondsSinceEpoch,
-                getContactTitle(message.handle.id, message.handle.address),
-                msgChat.participants.length > 1,
-                handle: message.handle,
-                contact: getContact(message.handle.address));
-            NotificationManager().processedNotifications.add(message.guid);
-            await msgChat.markReadUnread(true);
-            NewMessageManager().addMessage(msgChat, message);
-          }
-        }
+        await MessageHelper.handleNotification(message, msgChat);
       }
 
-      // Save the message
-      message.save().then((_) {
-        _messages.add(message);
-        msgChat.addMessage(message).then((value) {
-          // Create the attachments
-          List<dynamic> attachments = item['attachments'];
+      // Tell all listeners that we have a new message, and save the message
+      NewMessageManager().addMessage(msgChat, message);
+      await msgChat.addMessage(message,
+          changeUnreadStatus: notifyForNewMessage);
 
-          attachments.forEach((attachmentItem) async {
-            Attachment file = Attachment.fromMap(attachmentItem);
-            await file.save(message);
-          });
-        });
+      // Create the attachments
+      List<dynamic> attachments = item['attachments'];
+      attachments.forEach((attachmentItem) async {
+        Attachment file = Attachment.fromMap(attachmentItem);
+        await file.save(message);
       });
+
+      // Add message to the "master list"
+      _messages.add(message);
     });
 
     // Return all the synced messages
@@ -108,6 +83,44 @@ class MessageHelper {
     }
 
     return chats;
+  }
+
+  static Future<void> handleNotification(Message message, Chat chat) async {
+    // See if there is an existing message for the given GUID
+    Message existingMessage = await Message.findOne({"guid": message.guid});
+
+    // If we've already processed the GUID, skip it
+    if (NotificationManager().hasProcessed(message.guid)) return;
+
+    // Add the message to the "processed" list
+    NotificationManager().addProcessed(message.guid);
+
+    // Handle all the cases that would mean we don't show the notification
+    if (existingMessage != null || chat.isMuted) return;
+    if (message.isFromMe || message.handle == null) return;
+    if (LifeCycleManager().isAlive &&
+        NotificationManager().chatGuid == chat.guid) return;
+
+    String handleAddress;
+    if (message.handle != null) {
+      handleAddress = message.handle.address;
+    }
+
+    // Create the notification
+    String contactTitle = getContactTitle(handleAddress);
+    Contact contact = getContact(handleAddress);
+    String title = await getFullChatTitle(chat);
+    NotificationManager().createNewNotification(
+        title,
+        MessageHelper.getNotificationText(message),
+        chat.guid,
+        Random().nextInt(9998) + 1,
+        chat.id,
+        message.dateCreated.millisecondsSinceEpoch,
+        contactTitle,
+        chat.participants.length > 1,
+        handle: message.handle,
+        contact: contact);
   }
 
   static String getNotificationText(Message message) {
@@ -150,7 +163,21 @@ class MessageHelper {
       });
 
       return "$output: ${attachmentStr.join(attachmentStr.length == 2 ? " & " : ", ")}";
+    } else if (![null, ""].contains(message.associatedMessageGuid)) {
+      // It's a reaction message, get the "sender"
+      String sender = (message.isFromMe)
+          ? "You"
+          : formatPhoneNumber(message.handle.address);
+      if (!message.isFromMe && message.handle != null) {
+        Contact contact = getContact(message.handle.address);
+        if (contact != null) {
+          sender = contact.givenName ?? contact.displayName;
+        }
+      }
+
+      return "$sender ${message.text}";
     } else {
+      // It's all other message types
       return message.text;
     }
   }

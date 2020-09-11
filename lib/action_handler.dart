@@ -314,17 +314,11 @@ class ActionHandler {
 
     // If we already have a chat, don't fetch the participants
     if (currentChat != null) return;
-    // if (isHeadless) return;
 
     Map<String, dynamic> params = Map();
     params["chatGuid"] = newChat.guid;
     params["withParticipants"] = true;
     SocketManager().sendMessage("get-chat", params, (data) async {
-      // if (closeSocketOnFinish &&
-      //     SocketManager().attachmentDownloaders.length == 0 &&
-      //     SocketManager().attachmentSenders.length == 0) {
-      //   SocketManager().closeSocket();
-      // }
       if (data['status'] != 200) return;
 
       Map<String, dynamic> chatData = data["data"];
@@ -337,9 +331,7 @@ class ActionHandler {
         debugPrint("saved chat " + newChat.toMap().toString());
 
         // Update the main view
-        // await ChatBloc().getChats();
         await ChatBloc().updateChatPosition(newChat);
-        // NewMessageManager().updateWithMessage(null, null);
       }
     });
   }
@@ -358,9 +350,6 @@ class ActionHandler {
       bool isHeadless = false}) async {
     Message message = Message.fromMap(data);
     List<Chat> chats = MessageHelper.parseChats(data);
-    // chats.forEach((element) {
-    //   ChatBloc().moveChatToTop(element);
-    // });
 
     // Handle message differently depending on if there is a temp GUID match
     if (data.containsKey("tempGuid")) {
@@ -386,56 +375,23 @@ class ActionHandler {
           NewMessageManager()
               .updateMessage(chats.first, data['tempGuid'], message);
       }
-    } else {
-      if (SocketManager().processedGUIDS.contains(data["guid"])) return;
-
-      SocketManager().processedGUIDS.add(data["guid"]);
+    } else if (!NotificationManager().hasProcessed(data["guid"])) {
       // Add the message to the chats
       for (int i = 0; i < chats.length; i++) {
         debugPrint("Client received new message " + chats[i].guid);
-        List<String> processedNotificationsCopy = [];
-        processedNotificationsCopy
-            .addAll(NotificationManager().processedNotifications);
-        if (!NotificationManager()
-            .processedNotifications
-            .contains(message.guid)) {
-          NotificationManager().processedNotifications.add(message.guid);
-        }
+
+        // Gets the chat from the chat bloc
         Chat chat = ChatBloc().getChat(chats[i].guid);
         if (chat == null) {
           await ActionHandler.handleChat(
               chat: chats[i], checkIfExists: true, isHeadless: isHeadless);
           chat = chats[i];
         }
-        Message existing = await Message.findOne({"guid": message.guid});
-        await chats[i].save();
-        if (!message.isFromMe &&
-            message.handle != null &&
-            (NotificationManager().chatGuid != chat.guid ||
-                !LifeCycleManager().isAlive) &&
-            !chat.isMuted &&
-            !processedNotificationsCopy.contains(message.guid) &&
-            existing == null) {
-          String title = await getFullChatTitle(chats[i]);
-          NotificationManager().createNewNotification(
-              title,
-              MessageHelper.getNotificationText(message),
-              chats[i].guid,
-              Random().nextInt(9998) + 1,
-              chat.id,
-              message.dateCreated.millisecondsSinceEpoch,
-              getContactTitle(message.handle.id, message.handle.address),
-              chat.participants.length > 1,
-              handle: message.handle,
-              contact: getContact(message.handle.address));
-        }
 
-        debugPrint(
-            "(handle message) handle message ${message.text}, ${message.guid} " +
-                data["dateCreated"].toString());
-        debugPrint(
-            "(handle message) after saving ${message.text}, ${message.guid} " +
-                message.dateCreated.millisecondsSinceEpoch.toString());
+        // Handle the notification based on the message and chat
+        await MessageHelper.handleNotification(message, chat);
+
+        debugPrint("(ActionHandler.handleMessage) [${message.text}] - [${message.guid}]");
         await chat.addMessage(message);
 
         if (message.itemType == ItemTypes.nameChanged.index) {
@@ -468,20 +424,4 @@ class ActionHandler {
       });
     }
   }
-
-  // static void createNotification(Map<String, dynamic> notification) {
-  //   if (!NotificationManager()
-  //       .processedNotifications
-  //       .contains(notification["guid"])) {
-  //     NotificationManager().createNewNotification(
-  //       notification["contentTitle"],
-  //       notification["contentText"],
-  //       notification["group"],
-  //       notification["id"],
-  //       notification["summaryId"],
-  //       handle: notification["handle"],
-  //     );
-  //     NotificationManager().processedNotifications.add(notification["guid"]);
-  //   }
-  // }
 }

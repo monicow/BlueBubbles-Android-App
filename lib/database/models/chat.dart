@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:bluebubbles/action_handler.dart';
 import 'package:bluebubbles/blocs/chat_bloc.dart';
 import 'package:bluebubbles/helpers/message_helper.dart';
 import 'package:bluebubbles/managers/notification_manager.dart';
@@ -26,11 +27,16 @@ Future<String> getFullChatTitle(Chat _chat) async {
   String title = "";
   if (_chat.displayName == null || _chat.displayName == "") {
     Chat chat = await _chat.getParticipants();
-    List<String> titles = [];
 
+    // If there are no participants, try to get them from the server
+    if (chat.participants.length == 0) {
+      await ActionHandler.handleChat(chat: chat);
+      chat = await chat.getParticipants();
+    }
+
+    List<String> titles = [];
     for (int i = 0; i < chat.participants.length; i++) {
-      String name = getContactTitle(
-          chat.participants[i].id, chat.participants[i].address);
+      String name = getContactTitle(chat.participants[i].address);
 
       if (chat.participants.length > 1 && !name.startsWith('+1')) {
         name = name.trim().split(" ")[0];
@@ -63,8 +69,7 @@ Future<String> getFullChatTitle(Chat _chat) async {
 
 String getShortChatTitle(Chat _chat) {
   if (_chat.participants.length == 1) {
-    return getContactTitle(
-        _chat.participants[0].id, _chat.participants[0].address);
+    return getContactTitle(_chat.participants[0].address);
   } else if (_chat.displayName != null && _chat.displayName.length != 0) {
     return _chat.displayName;
   } else {
@@ -233,7 +238,7 @@ class Chat {
     return this;
   }
 
-  Future<Chat> markReadUnread(bool hasUnreadMessage) async {
+  Future<Chat> setUnreadStatus(bool hasUnreadMessage) async {
     final Database db = await DBProvider.db.database;
     if (hasUnreadMessage) {
       if (NotificationManager().chatGuid == this.guid) {
@@ -255,18 +260,23 @@ class Chat {
     return this;
   }
 
-  Future<Chat> addMessage(Message message) async {
+  Future<Chat> addMessage(Message message,
+      {bool changeUnreadStatus: true}) async {
     final Database db = await DBProvider.db.database;
 
     // Save the message
     Message newMessage = await message.save();
+    bool isNewer = false;
 
-    debugPrint(message.toMap().toString());
-
-    // If the message was saved correctly, update this chat's latestMessage info
-    if (newMessage.id != null) {
+    // If the message was saved correctly, update this chat's latestMessage info,
+    // but only if the incoming message's date is newer
+    if (newMessage.id != null &&
+        (this.latestMessageDate == null ||
+            this.latestMessageDate.millisecondsSinceEpoch <
+                message.dateCreated.millisecondsSinceEpoch)) {
       this.latestMessageText = MessageHelper.getNotificationText(message);
       this.latestMessageDate = message.dateCreated;
+      isNewer = true;
     }
 
     // Save the chat.
@@ -283,6 +293,17 @@ class Chat {
     if (entries.length == 0) {
       await db.insert(
           "chat_message_join", {"chatId": this.id, "messageId": message.id});
+    }
+
+    // If the incoming message was newer than the "last" one, set the unread status accordingly
+    if (changeUnreadStatus && isNewer) {
+      // If the message is from me, mark it unread
+      // If the message is not from the same chat as the current chat, mark unread
+      if (message.isFromMe) {
+        await this.setUnreadStatus(false);
+      } else if (NotificationManager().chatGuid != this.guid) {
+        await this.setUnreadStatus(true);
+      }
     }
 
     // Update the chat position
