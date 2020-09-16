@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:bluebubbles/database/repository/database.dart';
 import 'package:bluebubbles/database/repository/moor_database.dart';
+import 'package:path/path.dart' as p;
 import 'package:bluebubbles/settings.dart';
 import 'package:bluebubbles/socket_manager.dart';
 import 'package:flutter/cupertino.dart';

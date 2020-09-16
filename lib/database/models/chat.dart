@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:bluebubbles/action_handler.dart';
 import 'package:bluebubbles/blocs/chat_bloc.dart';
+import 'package:bluebubbles/database/repository/moor_database.dart';
 import 'package:bluebubbles/helpers/message_helper.dart';
 import 'package:bluebubbles/managers/notification_manager.dart';
 import 'package:bluebubbles/database/models/attachment.dart';
 import 'package:bluebubbles/database/repository/database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
+import 'package:moor/moor.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'handle.dart';
@@ -16,11 +18,6 @@ import '../../helpers/utils.dart';
 Chat chatFromJson(String str) {
   final jsonData = json.decode(str);
   return Chat.fromMap(jsonData);
-}
-
-String chatToJson(Chat data) {
-  final dyn = data.toMap();
-  return json.encode(dyn);
 }
 
 Future<String> getFullChatTitle(Chat _chat) async {
@@ -78,6 +75,8 @@ String getShortChatTitle(Chat _chat) {
 }
 
 class Chat {
+  /// Column values
+  /// Modify when you update the [ChatTable] in repository/moor_database.dart
   int id;
   String guid;
   int style;
@@ -87,8 +86,12 @@ class Chat {
   bool hasUnreadMessage;
   DateTime latestMessageDate;
   String latestMessageText;
-  String title;
   String displayName;
+
+  /// Local values, these are not related to the [ChatTable]
+  /// @param title The title that is created from the participants and displayname
+  /// @param participants
+  String title;
   List<Handle> participants;
 
   Chat({
@@ -105,6 +108,15 @@ class Chat {
     this.latestMessageText,
   });
 
+  /// Used to receive json data from server
+  ///
+  /// Returns a chat model created from the json
+  ///
+  /// Does NOT save to the db automatically, simply creates a [ChatEntity] from the json
+  /// and converts to this map
+  ///
+  ///
+  /// @param json The map of json data
   factory Chat.fromMap(Map<String, dynamic> json) {
     List<Handle> participants = [];
     if (json.containsKey('participants')) {
@@ -112,41 +124,37 @@ class Chat {
         participants.add(Handle.fromMap(item));
       });
     }
+
+    return Chat.fromEntity(ChatEntity.fromJson(json))
+      ..participants = participants;
+  }
+
+  /// Converts a [ChatEntity] to a [Chat] model. Returns a [Chat]
+  ///
+  /// Most often used when retreiving data from the db
+  ///
+  /// @param entity The chat entity to convert into this model
+  ///
+  /// @param participants OPTIONAL: The participants to attach to this model
+  factory Chat.fromEntity(ChatEntity entity,
+      {List<HandleEntity> participants}) {
     return new Chat(
-      id: json.containsKey("ROWID") ? json["ROWID"] : null,
-      guid: json["guid"],
-      style: json['style'],
-      chatIdentifier:
-          json.containsKey("chatIdentifier") ? json["chatIdentifier"] : null,
-      isArchived: (json["isArchived"] is bool)
-          ? json['isArchived']
-          : ((json['isArchived'] == 1) ? true : false),
-      isMuted: json.containsKey("isMuted")
-          ? (json["isMuted"] is bool)
-              ? json['isMuted']
-              : ((json['isMuted'] == 1) ? true : false)
-          : false,
-      hasUnreadMessage: json.containsKey("hasUnreadMessage")
-          ? (json["hasUnreadMessage"] is bool)
-              ? json['hasUnreadMessage']
-              : ((json['hasUnreadMessage'] == 1) ? true : false)
-          : false,
-      latestMessageText: json.containsKey("latestMessageText")
-          ? json["latestMessageText"]
-          : null,
-      latestMessageDate: json.containsKey("latestMessageDate") &&
-              json['latestMessageDate'] != null
-          ? new DateTime.fromMillisecondsSinceEpoch(
-              json['latestMessageDate'] as int)
-          : null,
-      displayName: json.containsKey("displayName") ? json["displayName"] : null,
-      participants: participants,
+      id: entity.id,
+      guid: entity.guid,
+      style: entity.style,
+      chatIdentifier: entity.chatIdentifier,
+      isArchived: entity.isArchived,
+      isMuted: entity.isMuted,
+      hasUnreadMessage: entity.hasUnreadMessage,
+      displayName: entity.displayName,
+      latestMessageDate: entity.latestMessageDate,
+      latestMessageText: entity.latestMessageText,
     );
   }
 
   Future<Chat> save(
       {bool updateIfAbsent = true, bool updateLocalVals = false}) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
     // Try to find an existing chat before saving it
     Chat existing = await Chat.findOne({"guid": this.guid});
@@ -162,15 +170,9 @@ class Chat {
     // If it already exists, update it
     if (existing == null) {
       // Remove the ID from the map for inserting
-      var map = this.toMap();
-      if (map.containsKey("ROWID")) {
-        map.remove("ROWID");
-      }
-      if (map.containsKey("participants")) {
-        map.remove("participants");
-      }
+      this.id = null;
 
-      this.id = await db.insert("chat", map);
+      this.id = await db.chatDao.insertEntry(this.toEntity());
     } else if (updateIfAbsent) {
       await this.update();
     }
@@ -184,9 +186,13 @@ class Chat {
   }
 
   Future<Chat> changeName(String name) async {
-    final Database db = await DBProvider.db.database;
-    await db.update("chat", {'displayName': name},
-        where: "ROWID = ?", whereArgs: [this.id]);
+    final AppDatabase db = await DBProvider.db.appDatabase;
+    if (this.id == null) await this.save();
+    ChatTableCompanion companion = new ChatTableCompanion(
+      displayName: Value(name),
+    );
+
+    await db.chatDao.updateEntry(companion);
     this.displayName = name;
     return this;
   }
@@ -209,28 +215,34 @@ class Chat {
   }
 
   Future<Chat> update() async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    Map<String, dynamic> params = {
-      "isArchived": this.isArchived ? 1 : 0,
-      "isMuted": this.isMuted ? 1 : 0,
-    };
+    // Map<String, dynamic> params = {
+    //   "isArchived": this.isArchived ? 1 : 0,
+    //   "isMuted": this.isMuted ? 1 : 0,
+    // };
 
-    // Only update the latestMessage info if it's not null
-    if (this.latestMessageDate != null) {
-      params["latestMessageText"] = this.latestMessageText;
-      params["latestMessageDate"] =
-          this.latestMessageDate.millisecondsSinceEpoch;
-    }
-
-    // Add display name if it's been updated
-    if (this.displayName != null) {
-      params["displayName"] = this.displayName;
-    }
+    /// We need to create a new companion, that way we can only set the values of
+    /// [isArchived], [isMuted], [latestMessageText], [latestMessageDate], and [displayName]
+    /// to their respective values
+    ///
+    ///[display] name is set even if it is null
+    ChatTableCompanion companion = ChatTableCompanion(
+      displayName: Value(this.displayName),
+      isMuted: this.isMuted != null ? Value(this.isMuted) : Value.absent(),
+      isArchived:
+          this.isArchived != null ? Value(this.isArchived) : Value.absent(),
+      latestMessageDate: this.latestMessageDate != null
+          ? Value(this.latestMessageDate)
+          : Value.absent(),
+      latestMessageText: this.latestMessageText != null
+          ? Value(this.latestMessageText)
+          : Value.absent(),
+    );
 
     // If it already exists, update it
     if (this.id != null) {
-      await db.update("chat", params, where: "ROWID = ?", whereArgs: [this.id]);
+      await db.chatDao.updateEntry(companion);
     } else {
       await this.save(updateIfAbsent: false);
     }
@@ -239,20 +251,22 @@ class Chat {
   }
 
   Future<Chat> setUnreadStatus(bool hasUnreadMessage) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
     if (hasUnreadMessage) {
       if (NotificationManager().chatGuid == this.guid) {
         return this;
       }
     }
     this.hasUnreadMessage = hasUnreadMessage;
-    Map<String, dynamic> params = {
-      "hasUnreadMessage": this.hasUnreadMessage ? 1 : 0,
-    };
+    ChatTableCompanion companion = new ChatTableCompanion(
+      hasUnreadMessage: this.hasUnreadMessage != null
+          ? Value(this.hasUnreadMessage)
+          : Value.absent(),
+    );
 
     // If it already exists, update it
     if (this.id != null) {
-      await db.update("chat", params, where: "ROWID = ?", whereArgs: [this.id]);
+      await db.chatDao.updateEntry(companion);
     } else {
       await this.save(updateIfAbsent: false);
     }
@@ -262,7 +276,7 @@ class Chat {
 
   Future<Chat> addMessage(Message message,
       {bool changeUnreadStatus: true}) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
     // Save the message
     Message newMessage = await message.save();
@@ -285,14 +299,12 @@ class Chat {
     await this.save();
 
     // Check join table and add if relationship doesn't exist
-    List entries = await db.query("chat_message_join",
-        where: "chatId = ? AND messageId = ?",
-        whereArgs: [this.id, message.id]);
+    List entries =
+        await db.cMJDao.find({"chatId": this.id, "messageId": message.id});
 
     // If the relationship doesn't exist, add it
     if (entries.length == 0) {
-      await db.insert(
-          "chat_message_join", {"chatId": this.id, "messageId": message.id});
+      await db.cMJDao.insertEntry(this.id, message.id);
     }
 
     // If the incoming message was newer than the "last" one, set the unread status accordingly
@@ -351,19 +363,6 @@ class Chat {
     // String reactionQualifier = reactionsOnly ? "IS NOT" : "IS";
     String query = ("SELECT"
         " message.ROWID AS ROWID,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.ROWID || '\"') || ']' AS attachmentId,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.guid || '\"') || ']' AS attachmentGuid,"
-        // "	'[' || GROUP_CONCAT( '\"' || attachment.blurhash || '\"') || ']' AS attachmentBlurhash,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.height || '\"') || ']' AS attachmentHeight,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.width || '\"') || ']' AS attachmentWidth,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.hideAttachment || '\"') || ']' AS attachmentHideAttachment,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.isOutgoing || '\"') || ']' AS attachmentIsOutgoing,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.isSticker || '\"') || ']' AS attachmentIsSticker,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.mimeType || '\"') || ']' AS attachmentMimeType,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.totalBytes || '\"') || ']' AS attachmentTotalBytes,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.transferName || '\"') || ']' AS attachmentTransferName,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.transferState || '\"') || ']' AS attachmentTransferState,"
-        // " '[' || GROUP_CONCAT( '\"' || attachment.uti || '\"') || ']' AS attachmentUti,"
         " message.originalROWID AS originalROWID,"
         " message.guid AS guid,"
         " message.handleId AS handleId,"
@@ -400,8 +399,6 @@ class Chat {
         " FROM message"
         " JOIN chat_message_join AS cmj ON message.ROWID = cmj.messageId"
         " JOIN chat ON cmj.chatId = chat.ROWID"
-        // " LEFT JOIN attachment_message_join ON attachment_message_join.messageId = message.ROWID "
-        // " LEFT JOIN attachment ON attachment.ROWID = attachment_message_join.attachmentId"
         " LEFT OUTER JOIN handle ON handle.ROWID = message.handleId"
         " WHERE chat.ROWID = ?");
 
@@ -487,7 +484,7 @@ class Chat {
   }
 
   Future<Chat> addParticipant(Handle participant) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
     // Save participant and add to list
     await participant.save();
@@ -496,12 +493,9 @@ class Chat {
     }
 
     // Check join table and add if relationship doesn't exist
-    List entries = await db.query("chat_handle_join",
-        where: "chatId = ? AND handleId = ?",
-        whereArgs: [this.id, participant.id]);
+    List<ChatHandleJoinData> entries = await db.cHJDao.find({"chatId": this.id, "handleId": participant.id});
     if (entries.length == 0) {
-      await db.insert(
-          "chat_handle_join", {"chatId": this.id, "handleId": participant.id});
+      await db.cHJDao.insertEntry( this.id, participant.id);
     }
 
     return this;
@@ -524,59 +518,30 @@ class Chat {
   }
 
   static Future<Chat> findOne(Map<String, dynamic> filters) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    List<String> whereParams = [];
-    filters.keys.forEach((filter) => whereParams.add('$filter = ?'));
-    List<dynamic> whereArgs = [];
-    filters.values.forEach((filter) => whereArgs.add(filter));
-    var res = await db.query("chat",
-        where: whereParams.join(" AND "), whereArgs: whereArgs, limit: 1);
-
-    if (res.isEmpty) {
-      return null;
-    }
-
-    return Chat.fromMap(res.elementAt(0));
+    List<ChatEntity> res = await db.chatDao.find(filters, findOne: true);
+    return !res.isEmpty ? Chat.fromEntity(res.first) : null;
   }
 
   static Future<List<Chat>> find(
       [Map<String, dynamic> filters = const {}, limit, offset]) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    List<String> whereParams = [];
-    filters.keys.forEach((filter) => whereParams.add('$filter = ?'));
-    List<dynamic> whereArgs = [];
-    filters.values.forEach((filter) => whereArgs.add(filter));
-
-    var res = await db.query("chat",
-        where: (whereParams.length > 0) ? whereParams.join(" AND ") : null,
-        whereArgs: (whereArgs.length > 0) ? whereArgs : null,
-        limit: limit,
-        offset: offset);
-    return (res.isNotEmpty) ? res.map((c) => Chat.fromMap(c)).toList() : [];
+    var res = await db.chatDao.find(filters, limit: limit, offset: offset);
+    return (res.isNotEmpty) ? res.map((c) => Chat.fromEntity(c)).toList() : [];
   }
 
   static Future<List<Chat>> getChats(
       {bool archived = false, int limit = 15, int offset = 0}) async {
-    final Database db = await DBProvider.db.database;
-    var res = await db.rawQuery(
-        "SELECT"
-        " chat.ROWID as ROWID,"
-        " chat.guid as guid,"
-        " chat.style as style,"
-        " chat.chatIdentifier as chatIdentifier,"
-        " chat.isArchived as isArchived,"
-        " chat.isMuted as isMuted,"
-        " chat.hasUnreadMessage as hasUnreadMessage,"
-        " chat.latestMessageDate as latestMessageDate,"
-        " chat.latestMessageText as latestMessageText,"
-        " chat.displayName as displayName"
-        " FROM chat"
-        " WHERE chat.isArchived = ? ORDER BY chat.latestMessageDate DESC LIMIT $limit OFFSET $offset;",
-        [archived ? 1 : 0]);
+    final AppDatabase db = await DBProvider.db.appDatabase;
+    var query = db.select(db.chatTable)
+      ..where((tbl) => tbl.isArchived.equals(archived))
+      ..orderBy([(tbl) => OrderingTerm.desc(tbl.latestMessageDate)])
+      ..limit(limit, offset: offset);
+    var res = await query.get();
 
-    return (res.isNotEmpty) ? res.map((c) => Chat.fromMap(c)).toList() : [];
+    return (res.isNotEmpty) ? res.map((c) => Chat.fromEntity(c)).toList() : [];
   }
 
   static flush() async {
@@ -584,19 +549,16 @@ class Chat {
     await db.delete("chat");
   }
 
-  Map<String, dynamic> toMap() => {
-        "ROWID": id,
-        "guid": guid,
-        "style": style,
-        "chatIdentifier": chatIdentifier,
-        "isArchived": isArchived ? 1 : 0,
-        "isMuted": isMuted ? 1 : 0,
-        "displayName": displayName,
-        "participants": participants.map((item) => item.toMap()),
-        "hasUnreadMessage": hasUnreadMessage ? 1 : 0,
-        "latestMessageDate": latestMessageDate != null
-            ? latestMessageDate.millisecondsSinceEpoch
-            : 0,
-        "latestMessageText": latestMessageText
-      };
+  ChatEntity toEntity() => ChatEntity(
+        id: this.id,
+        guid: this.guid,
+        style: this.style,
+        chatIdentifier: this.chatIdentifier,
+        isArchived: this.isArchived,
+        isMuted: this.isMuted,
+        hasUnreadMessage: this.hasUnreadMessage,
+        latestMessageDate: this.latestMessageDate,
+        latestMessageText: this.latestMessageText,
+        displayName: this.displayName,
+      );
 }

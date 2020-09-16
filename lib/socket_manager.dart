@@ -209,7 +209,7 @@ class SocketManager {
     Database db = await DBProvider.db.database;
 
     // Remove base tables
-    await Handle.flush();
+    // await Handle.flush();
     await Chat.flush();
     await Attachment.flush();
     await Message.flush();

@@ -37,12 +37,12 @@ class DBProvider {
   Future<AppDatabase> get appDatabase async {
     if (_appDatabase != null) return _appDatabase;
 
-    _appDatabase = AppDatabase();
+    _appDatabase = await AppDatabase();
     return _appDatabase;
   }
 
   initDB() async {
-    Directory documentsDirectory = await getApplicationDocumentsDirectory();
+    Directory documentsDirectory = await getApplicationSupportDirectory();
     _path = join(documentsDirectory.path, "chat.db");
     return await openDatabase(_path, version: 1, onOpen: (Database db) async {
       debugPrint("Database Opened");

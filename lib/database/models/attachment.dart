@@ -1,19 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:bluebubbles/database/repository/moor_database.dart';
 import 'package:bluebubbles/managers/settings_manager.dart';
 import 'package:bluebubbles/database/models/message.dart';
 import 'package:bluebubbles/database/repository/database.dart';
 import 'package:sqflite/sqflite.dart';
-
-Attachment attachmentFromJson(String str) {
-  final jsonData = json.decode(str);
-  return Attachment.fromMap(jsonData);
-}
-
-String attachmentToJson(Attachment data) {
-  final dyn = data.toMap();
-  return json.encode(dyn);
-}
 
 class Attachment {
   int id;
@@ -51,31 +42,29 @@ class Attachment {
     if ((json['transferName'] as String).endsWith(".caf")) {
       mimeType = "audio/caf";
     }
-    return new Attachment(
-      id: json.containsKey("ROWID") ? json["ROWID"] : null,
-      guid: json["guid"],
-      uti: json["uti"],
-      mimeType: mimeType,
-      transferState: json['transferState'].toString(),
-      isOutgoing: (json["isOutgoing"] is bool)
-          ? json['isOutgoing']
-          : ((json['isOutgoing'] == 1) ? true : false),
-      transferName: json['transferName'],
-      totalBytes: json['totalBytes'] is int ? json['totalBytes'] : 0,
-      isSticker: (json["isSticker"] is bool)
-          ? json['isSticker']
-          : ((json['isSticker'] == 1) ? true : false),
-      hideAttachment: (json["hideAttachment"] is bool)
-          ? json['hideAttachment']
-          : ((json['hideAttachment'] == 1) ? true : false),
-      blurhash: json.containsKey("blurhash") ? json["blurhash"] : null,
-      height: json.containsKey("height") ? json["height"] : 0,
-      width: json.containsKey("width") ? json["width"] : 0,
+    return Attachment.fromEntity(
+        AttachmentEntity.fromJson(json).copyWith(mimeType: mimeType));
+  }
+
+  factory Attachment.fromEntity(AttachmentEntity entity) {
+    return Attachment(
+      id: entity.id,
+      guid: entity.guid,
+      uti: entity.uti,
+      mimeType: entity.mimeType,
+      transferState: entity.transferState.toString(),
+      transferName: entity.transferName,
+      totalBytes: entity.totalBytes,
+      isSticker: entity.isSticker,
+      hideAttachment: entity.hideAttachments,
+      blurhash: entity.blurhash,
+      height: entity.height,
+      width: entity.width,
     );
   }
 
   Future<Attachment> save(Message message) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
     // Try to find an existing attachment before saving it
     Attachment existing = await Attachment.findOne({"guid": this.guid});
@@ -86,21 +75,10 @@ class Attachment {
     // If it already exists, update it
     if (existing == null) {
       // Remove the ID from the map for inserting
-      var map = this.toMap();
-      if (map.containsKey("ROWID")) {
-        map.remove("ROWID");
-      }
-      if (map.containsKey("participants")) {
-        map.remove("participants");
-      }
-      // if (message.id == null) {
-      //   //and here
-      //   await message.save();
-      // }
+      AttachmentEntity entity = this.toEntity().copyWith(id: null);
 
-      this.id = await db.insert("attachment", map);
-      await db.insert("attachment_message_join",
-          {"attachmentId": this.id, "messageId": message.id});
+      this.id = await db.attachmentDao.insertEntry(entity);
+      await db.aMJDao.insertEntry(this.id, message.id);
     }
 
     return this;
@@ -108,22 +86,16 @@ class Attachment {
 
   static Future<Attachment> replaceAttachment(
       String oldGuid, Attachment newAttachment) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
     Attachment existing = await Attachment.findOne({"guid": oldGuid});
     if (existing == null) {
       throw ("Old GUID does not exist!");
     }
 
-    Map<String, dynamic> params = newAttachment.toMap();
-    if (params.containsKey("ROWID")) {
-      params.remove("ROWID");
-    }
-    if (params.containsKey("handle")) {
-      params.remove("handle");
-    }
+    AttachmentTableCompanion params =
+        newAttachment.toEntity().copyWith(id: existing.id).toCompanion(true);
 
-    await db.update("attachment", params,
-        where: "ROWID = ?", whereArgs: [existing.id]);
+    await db.attachmentDao.updateEntry(params);
     String appDocPath = SettingsManager().appDocDir.path;
     String pathName = "$appDocPath/attachments/$oldGuid";
     Directory directory = Directory(pathName);
@@ -132,36 +104,25 @@ class Attachment {
   }
 
   static Future<Attachment> findOne(Map<String, dynamic> filters) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    List<String> whereParams = [];
-    filters.keys.forEach((filter) => whereParams.add('$filter = ?'));
-    List<dynamic> whereArgs = [];
-    filters.values.forEach((filter) => whereArgs.add(filter));
-    var res = await db.query("attachment",
-        where: whereParams.join(" AND "), whereArgs: whereArgs, limit: 1);
+    List<AttachmentEntity> res =
+        await db.attachmentDao.find(filters, getOne: true);
 
     if (res.isEmpty) {
       return null;
     }
 
-    return Attachment.fromMap(res.elementAt(0));
+    return Attachment.fromEntity(res.first);
   }
 
   static Future<List<Attachment>> find(
       [Map<String, dynamic> filters = const {}]) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    List<String> whereParams = [];
-    filters.keys.forEach((filter) => whereParams.add('$filter = ?'));
-    List<dynamic> whereArgs = [];
-    filters.values.forEach((filter) => whereArgs.add(filter));
-
-    var res = await db.query("attachment",
-        where: (whereParams.length > 0) ? whereParams.join(" AND ") : null,
-        whereArgs: (whereArgs.length > 0) ? whereArgs : null);
+    List<AttachmentEntity> res = await db.attachmentDao.find(filters);
     return (res.isNotEmpty)
-        ? res.map((c) => Attachment.fromMap(c)).toList()
+        ? res.map((c) => Attachment.fromEntity(c)).toList()
         : [];
   }
 
@@ -184,19 +145,15 @@ class Attachment {
     return "${size.toStringAsFixed(decimals)} $postfix";
   }
 
-  Map<String, dynamic> toMap() => {
-        "ROWID": id,
-        "guid": guid,
-        "uti": uti,
-        "mimeType": mimeType,
-        "transferState": transferState,
-        "isOutgoing": isOutgoing ? 1 : 0,
-        "transferName": transferName,
-        "totalBytes": totalBytes,
-        "isSticker": isSticker ? 1 : 0,
-        "hideAttachment": hideAttachment ? 1 : 0,
-        "blurhash": blurhash,
-        "height": height,
-        "width": width,
-      };
+  AttachmentEntity toEntity() => AttachmentEntity(
+        id: id,
+        guid: guid,
+        uti: uti,
+        transferState: int.parse(transferState),
+        isOutgoing: isOutgoing,
+        transferName: transferName,
+        totalBytes: totalBytes,
+        isSticker: isSticker,
+        hideAttachments: hideAttachment,
+      );
 }

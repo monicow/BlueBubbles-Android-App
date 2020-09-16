@@ -1,17 +1,33 @@
 import 'dart:io';
 
-import 'package:bluebubbles/managers/settings_manager.dart';
 import 'package:moor/ffi.dart';
 import 'package:moor/moor.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 part 'moor_database.g.dart';
 
-@UseMoor(include: {"join_tables.moor"}, daos: [ChatDao, MessageDao])
+@UseMoor(tables: [
+  MessageTable,
+  ChatTable,
+  HandleTable,
+  AttachmentTable
+], include: {
+  "join_tables.moor"
+}, daos: [
+  ChatDao,
+  MessageDao,
+  CMJDao,
+  AMJDao,
+  CHJDao,
+  HandleDao,
+  AttachmentDao
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// This is the DB verison, bump this up after changing the db
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 
   /// Migrates newer db versions, when modifying, make sure to increase schema version
   /// AND update the [onUpgrade] function
@@ -31,18 +47,20 @@ class AppDatabase extends _$AppDatabase {
 LazyDatabase _openConnection() {
   // the LazyDatabase util lets us find the right location for the file async.
   return LazyDatabase(() async {
-    /// Creates the file [chat.db] in the
-    final file = File(SettingsManager().appDocDir.path + "/chat.db");
-    return VmDatabase(file);
+    // put the database file, called db.sqlite here, into the documents folder
+    // for your app.
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'chatdb.sqlite'));
+    return VmDatabase(file, logStatements: true);
   });
 }
 
-@DataClassName("MessageEntry")
+@DataClassName("MessageEntity")
 class MessageTable extends Table {
   String get tableName => 'message';
 
   @JsonKey("ROWID")
-  IntColumn get id => integer().autoIncrement().named("ROWID")();
+  IntColumn get id => integer().autoIncrement()();
 
   @JsonKey("originalROWID")
   IntColumn get originalROWID => integer().nullable().named("originalROWID")();
@@ -134,8 +152,8 @@ class MessageTable extends Table {
       text().nullable().named("associatedMessageType")();
 
   @JsonKey("expressiveSendStyleId")
-  IntColumn get expressiveSendStyleId =>
-      integer().withDefault(const Constant(0)).named("expressiveSendStyleId")();
+  TextColumn get expressiveSendStyleId =>
+      text().nullable().named("expressiveSendStyleId")();
 
   @JsonKey("timeExpressiveSendStyleId")
   IntColumn get timeExpressiveSendStyleId => integer()
@@ -146,12 +164,98 @@ class MessageTable extends Table {
   BoolColumn get hasAttachments =>
       boolean().withDefault(const Constant(false)).named("hasAttachments")();
 
+  @JsonKey("hasReactions")
+  BoolColumn get hasReactions =>
+      boolean().withDefault(const Constant(false)).named("hasReactions")();
+
   @override
   List<String> get customConstraints =>
-      ['FOREIGN KEY (handleId) REFERENCES handle(ROWID)'];
+      ['UNIQUE(guid)', 'FOREIGN KEY (handleId) REFERENCES handle(id)'];
 }
 
-@UseDao(tables: [Chat])
+@UseDao(tables: [MessageTable])
+class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
+  MessageDao(AppDatabase attachedDatabase) : super(attachedDatabase);
+
+  Future<List<MessageEntity>> find(Map<String, dynamic> params,
+      {bool findOne = false, int limit, int offset = 0}) {
+    final query = select(attachedDatabase.messageTable);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.messageTable.columnsByName[key];
+      query.where((message) => column.equals(value));
+    });
+    if (limit != null) {
+      query.limit(limit, offset: offset);
+    }
+    return transaction(() => findOne ? (query..limit(1)).get() : query.get());
+  }
+
+  Future<int> insertEntry(MessageEntity entry) {
+    return transaction(() => into(attachedDatabase.messageTable).insert(entry));
+  }
+
+  Future<int> updateEntry(MessageTableCompanion companion) {
+    return transaction(() => (update(attachedDatabase.messageTable)
+          ..where((c) => c.id.equals(companion.id.value)))
+        .write(companion));
+  }
+
+  Future deleteEntry(Map<String, dynamic> params) async {
+    final deletion = delete(attachedDatabase.messageTable);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.messageTable.columnsByName[key];
+      deletion.where((message) => column.equals(value));
+    });
+    return transaction(() => deletion.go());
+  }
+}
+
+@DataClassName("ChatEntity")
+class ChatTable extends Table {
+  String get tableName => 'chat';
+
+  @JsonKey("ROWID")
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get guid => text()();
+
+  IntColumn get style => integer()();
+
+  @JsonKey("chatIdentifier")
+  TextColumn get chatIdentifier => text().named("chatIdentifier")();
+
+  @JsonKey("isArchived")
+  BoolColumn get isArchived =>
+      boolean().withDefault(const Constant(false)).named("isArchived")();
+
+  @JsonKey("isMuted")
+  BoolColumn get isMuted =>
+      boolean().withDefault(const Constant(false)).named("isMuted")();
+
+  @JsonKey("hasUnreadMessage")
+  BoolColumn get hasUnreadMessage =>
+      boolean().withDefault(const Constant(false)).named("hasUnreadMessage")();
+
+  @JsonKey("latestMessageDate")
+  DateTimeColumn get latestMessageDate => dateTime()
+      .nullable()
+      .withDefault(const Constant(null))
+      .named("latestMessageDate")();
+
+  @JsonKey("latestMessageText")
+  TextColumn get latestMessageText =>
+      text().nullable().named("latestMessageText")();
+
+  @JsonKey("displayName")
+  TextColumn get displayName => text().nullable().named("displayName")();
+
+  @override
+  List<String> get customConstraints => ['UNIQUE(guid)'];
+}
+
+@UseDao(tables: [ChatTable])
 class ChatDao extends DatabaseAccessor<AppDatabase> with _$ChatDaoMixin {
   ChatDao(AppDatabase attachedDatabase) : super(attachedDatabase);
 
@@ -159,119 +263,268 @@ class ChatDao extends DatabaseAccessor<AppDatabase> with _$ChatDaoMixin {
   ///Upates automatically with a [ChatTable] instance
   ///Does not auto convert to a [Chat] instance, so no methods
   ///chatTable is a property of the database, referring to the actual table in the db
-  Future<List<ChatEntity>> find(Map<String, dynamic> params) {
-    final query = select(attachedDatabase.chat);
+  Future<List<ChatEntity>> find(Map<String, dynamic> params,
+      {bool findOne = false, int offset = 0, int limit}) {
+    final query = select(attachedDatabase.chatTable);
 
-    for (final entry in params.entries) {
-      final column = attachedDatabase.chat.columnsByName[entry.key];
-      final columnMatches = entry.value.fold(null, (condition, element) {
-        if (condition == null) return column.equalsExp(element);
-        return condition | column.equalsExp(element);
-      });
-
-      query.where(columnMatches);
-      break;
+    params.forEach((key, value) {
+      final column = attachedDatabase.chatTable.columnsByName[key];
+      query.where((ChatTable chat) => column.equals(value));
+    });
+    if (limit != null) {
+      query.limit(limit, offset: offset);
     }
-    return query.get();
+
+    return transaction(() => findOne ? (query..limit(1)).get() : query.get());
   }
 
   Future<int> insertEntry(ChatEntity entry) async {
-    return into(attachedDatabase.chat).insert(entry);
+    return transaction(() => into(attachedDatabase.chatTable).insert(entry));
   }
 
-  Future<bool> updateEntry(ChatEntity entry) async {
-    return update(attachedDatabase.chat).replace(entry);
+  Future<int> updateEntry(ChatTableCompanion companion) {
+    return transaction(() => (update(attachedDatabase.chatTable)
+          ..where((c) => c.id.equals(companion.id.value)))
+        .write(companion));
   }
 
   Future deleteEntry(Map<String, dynamic> params) async {
-    final deletion = delete(attachedDatabase.chat);
+    final deletion = delete(attachedDatabase.chatTable);
 
-    for (final entry in params.entries) {
-      final column = attachedDatabase.chat.columnsByName[entry.key];
-      final columnMatches = entry.value.fold(null, (condition, element) {
-        if (condition == null) return column.equalsExp(element);
-        return condition | column.equalsExp(element);
-      });
+    params.forEach((key, value) {
+      final column = attachedDatabase.chatTable.columnsByName[key];
+      deletion.where((ChatTable chat) => column.equals(value));
+    });
+    return transaction(() => deletion.go());
+  }
 
-      deletion.where(columnMatches);
-      break;
+  Future<List<MessageWithHandleByCMJ>> getMessages(
+    int chatId,
+    bool originalROWIDIsNull, {
+    int limit,
+    int offset = 0,
+  }) async {
+    final query = select(attachedDatabase.messageTable).join([
+      innerJoin(
+          attachedDatabase.chatMessageJoin,
+          attachedDatabase.chatMessageJoin.messageId
+              .equalsExp(attachedDatabase.messageTable.id)),
+      leftOuterJoin(
+          attachedDatabase.handleTable,
+          attachedDatabase.handleTable.id
+              .equalsExp(attachedDatabase.messageTable.handleId)),
+    ])
+      ..where(attachedDatabase.chatMessageJoin.messageId.equals(chatId));
+    if (limit != null) {
+      query.limit(limit, offset: offset);
     }
-    return deletion.go();
+    return transaction(() async => (await query.get()).map((row) {
+          return MessageWithHandleByCMJ(
+            row.readTable(attachedDatabase.messageTable),
+            row.readTable(attachedDatabase.handleTable),
+          );
+        }));
   }
 }
 
-@UseDao(tables: [Message])
-class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
-  MessageDao(AppDatabase attachedDatabase) : super(attachedDatabase);
+@DataClassName("HandleEntity")
+class HandleTable extends Table {
+  String get tableName => 'handle';
 
-  Future<List<MessageEntity>> find(Map<String, dynamic> params) {
-    final query = select(attachedDatabase.message);
+  @JsonKey("ROWID")
+  IntColumn get id => integer().autoIncrement()();
 
-    for (final entry in params.entries) {
-      final column = attachedDatabase.message.columnsByName[entry.key];
-      final columnMatches = entry.value.fold(null, (condition, element) {
-        if (condition == null) return column.equalsExp(element);
-        return condition | column.equalsExp(element);
-      });
+  TextColumn get address => text()();
 
-      query.where(columnMatches);
-      break;
-    }
-    return query.get();
+  TextColumn get country => text().nullable()();
+
+  @JsonKey("uncanonicalizedId")
+  TextColumn get uncanonicalizedId =>
+      text().nullable().named("uncanonicalizedId")();
+}
+
+@UseDao(tables: [HandleTable])
+class HandleDao extends DatabaseAccessor<AppDatabase> with _$HandleDaoMixin {
+  HandleDao(AppDatabase attachedDatabase) : super(attachedDatabase);
+
+  Future<List<HandleEntity>> find(Map<String, dynamic> params,
+      {bool getOne = false}) {
+    final query = select(attachedDatabase.handleTable);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.handleTable.columnsByName[key];
+      query.where((handle) => column.equals(value));
+    });
+    return transaction(() => getOne ? (query..limit(1)).get() : query.get());
   }
 
-  Future<int> insertEntry(MessageEntity entry) {
-    return into(attachedDatabase.message).insert(entry);
+  Future<int> insertEntry(HandleEntity entity) {
+    return transaction(() => into(attachedDatabase.handleTable).insert(entity));
   }
 
-  Future<bool> updateEntry(MessageEntity entry) {
-    return update(attachedDatabase.message).replace(entry);
+  Future<int> updateEntry(HandleTableCompanion companion) {
+    return transaction(() => (update(attachedDatabase.handleTable)
+          ..where((h) => h.id.equals(companion.id.value)))
+        .write(companion));
   }
 
   Future deleteEntry(Map<String, dynamic> params) async {
-    final deletion = delete(attachedDatabase.message);
+    final deletion = delete(attachedDatabase.handleTable);
 
-    for (final entry in params.entries) {
-      final column = attachedDatabase.message.columnsByName[entry.key];
-      final columnMatches = entry.value.fold(null, (condition, element) {
-        if (condition == null) return column.equalsExp(element);
-        return condition | column.equalsExp(element);
-      });
-
-      deletion.where(columnMatches);
-      break;
-    }
-    return deletion.go();
+    params.forEach((key, value) {
+      final column = attachedDatabase.handleTable.columnsByName[key];
+      deletion.where((handle) => column.equals(value));
+    });
+    return transaction(() => deletion.go());
   }
 }
 
 @UseDao(tables: [ChatMessageJoin])
-class CMJDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
+class CMJDao extends DatabaseAccessor<AppDatabase> with _$CMJDaoMixin {
   CMJDao(AppDatabase attachedDatabase) : super(attachedDatabase);
 
-  Future<int> insertEntry(int chatId, int messageId) {
-    return into(attachedDatabase.chatMessageJoin)
-        .insert(new ChatMessageJoinData(chatId: chatId, messageId: messageId));
+  Future<List<ChatMessageJoinData>> find(Map<String, dynamic> params) {
+    final query = select(attachedDatabase.chatMessageJoin);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.chatMessageJoin.columnsByName[key];
+      query.where((message) => column.equals(value));
+    });
+    return transaction(() => query.get());
   }
 
-  Future<bool> updateEntry(int chatId, int messageId) {
-    return update(attachedDatabase.chatMessageJoin)
-        .replace(new ChatMessageJoinData(chatId: chatId, messageId: messageId));
+  Future<int> insertEntry(int chatId, int messageId) {
+    return transaction(() => into(attachedDatabase.chatMessageJoin)
+        .insert(new ChatMessageJoinData(chatId: chatId, messageId: messageId)));
+  }
+}
+
+@UseDao(tables: [ChatHandleJoin])
+class CHJDao extends DatabaseAccessor<AppDatabase> with _$CHJDaoMixin {
+  CHJDao(AppDatabase attachedDatabase) : super(attachedDatabase);
+
+  Future<List<ChatHandleJoinData>> find(Map<String, dynamic> params) {
+    final query = select(attachedDatabase.chatHandleJoin);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.chatHandleJoin.columnsByName[key];
+      query.where((ajm) => column.equals(value));
+    });
+    return transaction(() => query.get());
+  }
+
+  Future<int> insertEntry(int chatId, int handleId) {
+    return transaction(() => into(attachedDatabase.chatHandleJoin)
+        .insert(new ChatHandleJoinData(chatId: chatId, handleId: handleId)));
+  }
+}
+
+@UseDao(tables: [ChatMessageJoin])
+class AMJDao extends DatabaseAccessor<AppDatabase> with _$AMJDaoMixin {
+  AMJDao(AppDatabase attachedDatabase) : super(attachedDatabase);
+
+  Future<List<AttachmentMessageJoinData>> find(Map<String, dynamic> params) {
+    final query = select(attachedDatabase.attachmentMessageJoin);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.attachmentMessageJoin.columnsByName[key];
+      query.where((ajm) => column.equals(value));
+    });
+    return transaction(() => query.get());
+  }
+
+  Future<int> insertEntry(int attachmentId, int messageId) {
+    return transaction(() => into(attachedDatabase.attachmentMessageJoin)
+        .insert(new AttachmentMessageJoinData(
+            attachmentId: attachmentId, messageId: messageId)));
+  }
+}
+
+@DataClassName("AttachmentEntity")
+class AttachmentTable extends Table {
+  String get tableName => "attachment";
+  @JsonKey("ROWID")
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get guid => text()();
+
+  TextColumn get uti => text()();
+
+  @JsonKey("mimeType")
+  TextColumn get mimeType => text().nullable().named("mimeType")();
+
+  @JsonKey("transferState")
+  IntColumn get transferState =>
+      integer().withDefault(const Constant(0)).named("transferState")();
+
+  @JsonKey("isOutgoing")
+  BoolColumn get isOutgoing =>
+      boolean().withDefault(const Constant(false)).named("isOutgoing")();
+
+  @JsonKey("transferName")
+  TextColumn get transferName => text().named("transferName")();
+
+  @JsonKey("totalBytes")
+  IntColumn get totalBytes => integer().named("totalBytes")();
+
+  @JsonKey("isSticker")
+  BoolColumn get isSticker =>
+      boolean().withDefault(const Constant(false)).named("isSticker")();
+
+  @JsonKey("hideAttachments")
+  BoolColumn get hideAttachments =>
+      boolean().withDefault(const Constant(false)).named("hideAttachments")();
+
+  TextColumn get blurhash => text().nullable()();
+
+  IntColumn get height => integer().nullable()();
+
+  IntColumn get width => integer().nullable()();
+  @override
+  List<String> get customConstraints => ['UNIQUE(guid)'];
+}
+
+@UseDao(tables: [HandleTable])
+class AttachmentDao extends DatabaseAccessor<AppDatabase>
+    with _$AttachmentDaoMixin {
+  AttachmentDao(AppDatabase attachedDatabase) : super(attachedDatabase);
+
+  Future<List<AttachmentEntity>> find(Map<String, dynamic> params,
+      {bool getOne = false}) {
+    final query = select(attachedDatabase.attachmentTable);
+
+    params.forEach((key, value) {
+      final column = attachedDatabase.attachmentTable.columnsByName[key];
+      query.where((attachment) => column.equals(value));
+    });
+    return transaction(() => getOne ? (query..limit(1)).get() : query.get());
+  }
+
+  Future<int> insertEntry(AttachmentEntity entity) {
+    return transaction(
+        () => into(attachedDatabase.attachmentTable).insert(entity));
+  }
+
+  Future<int> updateEntry(AttachmentTableCompanion companion) {
+    return transaction(() => (update(attachedDatabase.attachmentTable)
+          ..where((h) => h.id.equals(companion.id.value)))
+        .write(companion));
   }
 
   Future deleteEntry(Map<String, dynamic> params) async {
-    final deletion = delete(attachedDatabase.chatMessageJoin);
+    final deletion = delete(attachedDatabase.attachmentTable);
 
-    for (final entry in params.entries) {
-      final column = attachedDatabase.chatMessageJoin.columnsByName[entry.key];
-      final columnMatches = entry.value.fold(null, (condition, element) {
-        if (condition == null) return column.equalsExp(element);
-        return condition | column.equalsExp(element);
-      });
-
-      deletion.where(columnMatches);
-      break;
-    }
-    return deletion.go();
+    params.forEach((key, value) {
+      final column = attachedDatabase.attachmentTable.columnsByName[key];
+      deletion.where((attachment) => column.equals(value));
+    });
+    return transaction(() => deletion.go());
   }
+}
+
+class MessageWithHandleByCMJ {
+  MessageWithHandleByCMJ(this.message, this.handle);
+
+  final MessageEntity message;
+  final HandleEntity handle;
 }

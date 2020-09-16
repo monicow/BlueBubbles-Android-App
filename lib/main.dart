@@ -71,6 +71,7 @@ Future<Null> main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   await DBProvider.db.initDB();
+  await DBProvider.db.appDatabase;
   await initializeDateFormatting('fr_FR', null);
 
   runZonedGuarded<Future<Null>>(() async {

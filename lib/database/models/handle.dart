@@ -1,18 +1,9 @@
 import 'dart:convert';
 import 'package:bluebubbles/database/repository/database.dart';
+import 'package:bluebubbles/database/repository/moor_database.dart';
 import 'package:sqflite/sqflite.dart';
 
 import './chat.dart';
-
-Handle handleFromJson(String str) {
-  final jsonData = json.decode(str);
-  return Handle.fromMap(jsonData);
-}
-
-String handleToJson(Handle data) {
-  final dyn = data.toMap();
-  return json.encode(dyn);
-}
 
 class Handle {
   int id;
@@ -28,18 +19,20 @@ class Handle {
   });
 
   factory Handle.fromMap(Map<String, dynamic> json) {
+    return Handle.fromHandleEntity(HandleEntity.fromJson(json));
+  }
+
+  factory Handle.fromHandleEntity(HandleEntity entity) {
     return new Handle(
-      id: json.containsKey("ROWID") ? json["ROWID"] : null,
-      address: json["address"],
-      country: json.containsKey("country") ? json["country"] : null,
-      uncanonicalizedId: json.containsKey("uncanonicalizedId")
-          ? json["uncanonicalizedId"]
-          : null,
+      id: entity.id,
+      address: entity.address,
+      country: entity.country,
+      uncanonicalizedId: entity.uncanonicalizedId,
     );
   }
 
   Future<Handle> save([bool updateIfAbsent = false]) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
     // Try to find an existing chat before saving it
     Handle existing = await Handle.findOne({"address": this.address});
@@ -50,10 +43,9 @@ class Handle {
     // If it already exists, update it
     if (existing == null) {
       // Remove the ID from the map for inserting
-      var map = this.toMap();
-      map.remove("ROWID");
+      this.id = null;
       try {
-        this.id = await db.insert("handle", map);
+        this.id = await db.handleDao.insertEntry(this.toEntity());
       } catch (e) {
         this.id = null;
       }
@@ -65,19 +57,18 @@ class Handle {
   }
 
   Future<Handle> update() async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
     // If it already exists, update it
     if (this.id != null) {
-      await db.update(
-          "handle",
-          {
-            "address": this.address,
-            "country": this.country,
-            "uncanonicalizedId": this.uncanonicalizedId
-          },
-          where: "ROWID = ?",
-          whereArgs: [this.id]);
+      HandleTableCompanion entity = HandleEntity(
+        id: null,
+        address: this.address,
+        country: this.country,
+        uncanonicalizedId: this.uncanonicalizedId,
+      ).toCompanion(true);
+
+      await db.handleDao.updateEntry(entity);
     } else {
       await this.save(false);
     }
@@ -86,35 +77,26 @@ class Handle {
   }
 
   static Future<Handle> findOne(Map<String, dynamic> filters) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    List<String> whereParams = [];
-    filters.keys.forEach((filter) => whereParams.add('$filter = ?'));
-    List<dynamic> whereArgs = [];
-    filters.values.forEach((filter) => whereArgs.add(filter));
-    var res = await db.query("handle",
-        where: whereParams.join(" AND "), whereArgs: whereArgs, limit: 1);
+    List<HandleEntity> res = await db.handleDao.find(filters, getOne: true);
 
     if (res.isEmpty) {
       return null;
     }
 
-    return Handle.fromMap(res.elementAt(0));
+    return Handle.fromHandleEntity(res.first);
   }
 
   static Future<List<Handle>> find(
       [Map<String, dynamic> filters = const {}]) async {
-    final Database db = await DBProvider.db.database;
+    final AppDatabase db = await DBProvider.db.appDatabase;
 
-    List<String> whereParams = [];
-    filters.keys.forEach((filter) => whereParams.add('$filter = ?'));
-    List<dynamic> whereArgs = [];
-    filters.values.forEach((filter) => whereArgs.add(filter));
-    var res = await db.query("handle",
-        where: (whereParams.length > 0) ? whereParams.join(" AND ") : null,
-        whereArgs: (whereArgs.length > 0) ? whereArgs : null);
+    List<HandleEntity> res = await db.handleDao.find(filters);
 
-    return (res.isNotEmpty) ? res.map((c) => Handle.fromMap(c)).toList() : [];
+    return (res.isNotEmpty)
+        ? res.map((c) => Handle.fromHandleEntity(c)).toList()
+        : [];
   }
 
   static Future<List<Chat>> getChats(Handle handle) async {
@@ -137,15 +119,15 @@ class Handle {
     return (res.isNotEmpty) ? res.map((c) => Chat.fromMap(c)).toList() : [];
   }
 
-  static flush() async {
-    final Database db = await DBProvider.db.database;
-    await db.delete("handle");
-  }
+  // static flush() async {
+  //   final Database db = await DBProvider.db.database;
+  //   await db.delete("handle");
+  // }
 
-  Map<String, dynamic> toMap() => {
-        "ROWID": id,
-        "address": address,
-        "country": country,
-        "uncanonicalizedId": uncanonicalizedId,
-      };
+  HandleEntity toEntity() => HandleEntity(
+        id: this.id,
+        address: this.address,
+        country: this.country,
+        uncanonicalizedId: this.uncanonicalizedId,
+      );
 }

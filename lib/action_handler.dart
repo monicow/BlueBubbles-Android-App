@@ -328,7 +328,6 @@ class ActionHandler {
 
         // Resave the chat after we've got the participants
         await newChat.save();
-        debugPrint("saved chat " + newChat.toMap().toString());
 
         // Update the main view
         await ChatBloc().updateChatPosition(newChat);
@@ -391,7 +390,8 @@ class ActionHandler {
         // Handle the notification based on the message and chat
         await MessageHelper.handleNotification(message, chat);
 
-        debugPrint("(ActionHandler.handleMessage) [${message.text}] - [${message.guid}]");
+        debugPrint(
+            "(ActionHandler.handleMessage) [${message.text}] - [${message.guid}]");
         await chat.addMessage(message);
 
         if (message.itemType == ItemTypes.nameChanged.index) {
