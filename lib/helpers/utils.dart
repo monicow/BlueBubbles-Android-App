@@ -98,49 +98,57 @@ bool sameAddress(String address1, String address2) {
   String formattedNumber1 = sanitizeAddress(address1);
   String formattedNumber2 = sanitizeAddress(address2);
 
-  // Strip any unnecessary pluses and "1"s
-  // If it starts with a plus, is in the US, and the length is 11, strip the +
-  // Having only 11 characters means it was missing the "1" after "+1"
-  String ccUpper = countryCode.toUpperCase();
-  if (formattedNumber1.startsWith("+") &&
-      ccUpper == "US" &&
-      formattedNumber1.length == 11) {
-    formattedNumber1 = formattedNumber1.substring(1);
-  } else if (formattedNumber1.startsWith("1") &&
-      ccUpper == "US" &&
-      formattedNumber1.length == 11) {
-    formattedNumber1 = formattedNumber1.substring(1);
-  }
-  if (formattedNumber2.startsWith("+") &&
-      ccUpper == "US" &&
-      formattedNumber2.length == 11) {
-    formattedNumber2 = formattedNumber1.substring(1);
-  } else if (!formattedNumber2.startsWith("1") &&
-      ccUpper == "US" &&
-      formattedNumber2.length == 11) {
-    formattedNumber2 = formattedNumber2.substring(1);
-  }
-
-  // Now check if the values are equal
-  if (formattedNumber1 == formattedNumber2) return true;
-
-  // If they are not equal, try to strip the dial code (if any)
-  if (formattedNumber1.startsWith("+")) {
-    if (getCodeMap().containsKey(countryCode)) {
-      String dialCode = getCodeMap()[countryCode];
-      formattedNumber1 = formattedNumber1.substring(dialCode.length);
+  try {
+    // Strip any unnecessary pluses and "1"s
+    // If it starts with a plus, is in the US, and the length is 11, strip the +
+    // Having only 11 characters means it was missing the "1" after "+1"
+    String ccUpper = countryCode.toUpperCase();
+    if (formattedNumber1.startsWith("+") &&
+        ccUpper == "US" &&
+        formattedNumber1.length == 11) {
+      formattedNumber1 = formattedNumber1.substring(1);
+    } else if (formattedNumber1.startsWith("1") &&
+        ccUpper == "US" &&
+        formattedNumber1.length == 11) {
+      formattedNumber1 = formattedNumber1.substring(1);
     }
-  }
-
-  if (formattedNumber2.startsWith("+")) {
-    if (getCodeMap().containsKey(countryCode)) {
-      String dialCode = getCodeMap()[countryCode];
-      formattedNumber2 = formattedNumber2.substring(dialCode.length);
+    if (formattedNumber2.startsWith("+") &&
+        ccUpper == "US" &&
+        formattedNumber2.length == 11) {
+      formattedNumber2 = formattedNumber1.substring(1);
+    } else if (!formattedNumber2.startsWith("1") &&
+        ccUpper == "US" &&
+        formattedNumber2.length == 11) {
+      formattedNumber2 = formattedNumber2.substring(1);
     }
-  }
 
-  // Now that the dial code is stripped, check if they are the same
-  if (formattedNumber1 == formattedNumber2) return true;
+    // Now check if the values are equal
+    if (formattedNumber1 == formattedNumber2) return true;
+
+    // If they are not equal, try to strip the dial code (if any)
+    if (formattedNumber1.startsWith("+")) {
+      if (getCodeMap().containsKey(countryCode)) {
+        String dialCode = getCodeMap()[countryCode];
+        if (formattedNumber1.length > dialCode.length) {
+          formattedNumber1 = formattedNumber1.substring(dialCode.length);
+        }
+      }
+    }
+
+    if (formattedNumber2.startsWith("+")) {
+      if (getCodeMap().containsKey(countryCode)) {
+        String dialCode = getCodeMap()[countryCode];
+        if (formattedNumber1.length > dialCode.length) {
+          formattedNumber2 = formattedNumber2.substring(dialCode.length);
+        }
+      }
+    }
+
+    // Now that the dial code is stripped, check if they are the same
+    if (formattedNumber1 == formattedNumber2) return true;
+  } catch (ex) {
+    print('Failed to compare addresses in sameAddress(). Returning false: ${ex.toString()}');
+  }
 
   // I didn't return above in case we want to add more checks below here
   return false;

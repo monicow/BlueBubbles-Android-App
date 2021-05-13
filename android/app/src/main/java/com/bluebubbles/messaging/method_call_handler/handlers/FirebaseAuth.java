@@ -62,7 +62,6 @@ public class FirebaseAuth implements Handler {
                         if (!task.isSuccessful()) {
                             Log.d("FCM", "getInstanceId failed", task.getException());
                             try {
-
                                 result.error("Failed to authenticate", "getInstanceId failed", task.getException());
                             } catch (IllegalStateException e) {
 
@@ -74,6 +73,7 @@ public class FirebaseAuth implements Handler {
                             try {
                                 result.success(token);
                             } catch (IllegalStateException e) {
+
                             }
                         }
                     }

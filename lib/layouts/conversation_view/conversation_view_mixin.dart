@@ -693,27 +693,29 @@ mixin ConversationViewMixin<ConversationViewState extends StatefulWidget>
     Map<String, dynamic> params = {};
     showDialog(
       context: context,
-      child: AlertDialog(
-        backgroundColor: Theme.of(context).accentColor,
-        title: Text(
-          "Creating a new chat...",
-          style: Theme.of(context).textTheme.bodyText1,
-        ),
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Container(
-              // height: 70,
-              // color: Colors.black,
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).primaryColor),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).accentColor,
+          title: Text(
+            "Creating a new chat...",
+            style: Theme.of(context).textTheme.bodyText1,
+          ),
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Container(
+                // height: 70,
+                // color: Colors.black,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).primaryColor),
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
 
     params["participants"] = participants;
@@ -743,24 +745,26 @@ mixin ConversationViewMixin<ConversationViewState extends StatefulWidget>
             showDialog(
               barrierDismissible: false,
               context: context,
-              child: AlertDialog(
-                title: Text(
-                  "Could not create",
-                ),
-                content: Text(
-                  "Reason: (${data["error"]["type"]}) -> ${data["error"]["message"]}",
-                ),
-                actions: [
-                  FlatButton(
-                    child: Text(
-                      "Ok",
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  )
-                ],
-              ),
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text(
+                    "Could not create",
+                  ),
+                  content: Text(
+                    "Reason: (${data["error"]["type"]}) -> ${data["error"]["message"]}",
+                  ),
+                  actions: [
+                    TextButton(
+                      child: Text(
+                        "Ok",
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    )
+                  ],
+                );
+              }
             );
             completer.complete(null);
             return;
